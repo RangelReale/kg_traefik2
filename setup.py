@@ -5,7 +5,7 @@ import setuptools
 
 __version__ = re.search(
     r'__version__\s*=\s*[\'"]([^\'"]*)[\'"]',  # It excludes inline comment too
-    open('kg_rabbitmq/__init__.py', encoding='utf_8_sig').read()
+    open('kg_traefik2/__init__.py', encoding='utf_8_sig').read()
     ).group(1)
 
 HERE = pathlib.Path(__file__).parent
