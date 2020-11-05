@@ -13,6 +13,64 @@ from .option import Traefik2Options
 
 
 class Traefik2Builder(Builder):
+    """
+    Traefik 2 builder.
+
+    Based on `Traefik & Kubernetes <https://doc.traefik.io/traefik/providers/kubernetes-crd/>`_.
+
+    .. list-table::
+        :header-rows: 1
+
+        * - build
+          - description
+        * - BUILD_CRD
+          - creates CRDs
+        * - BUILD_ACCESSCONTROL
+          - creates service account, roles, and roles bindings
+        * - BUILD_SERVICE
+          - creates Deployment and Service
+
+    .. list-table::
+        :header-rows: 1
+
+        * - build item
+          - description
+        * - BUILDITEM_SERVICE_ACCOUNT
+          - ServiceAccount
+        * - BUILDITEM_CLUSTER_ROLE
+          - ClusterRole
+        * - BUILDITEM_CLUSTER_ROLE_BINDING
+          - ClusterRoleBinding
+        * - BUILDITEM_DEPLOYMENT
+          - Deployment
+        * - BUILDITEM_SERVICE
+          - Service
+
+    .. list-table::
+        :header-rows: 1
+
+        * - object name
+          - description
+          - default value
+        * - service
+          - Service
+          - ```<basename>```
+        * - service-account
+          - ServiceAccount
+          - ```<basename>```
+        * - cluster-role
+          - ClusterRole
+          - ```<basename>```
+        * - cluster-role-binding
+          - ClusterRoleBinding
+          - ```<basename>```
+        * - deployment
+          - Deployment
+          - ```<basename>```
+        * - pod-label-all
+          - label *app* to be used by selection
+          - ```<basename>```
+    """
     options: Traefik2Options
     _namespace: str
 
@@ -22,8 +80,8 @@ class Traefik2Builder(Builder):
     BUILD_ACCESSCONTROL: TBuild = 'accesscontrol'
     BUILD_SERVICE: TBuild = 'service'
 
-    BUILDITEM_CLUSTER_ROLE: TBuildItem = 'cluster-role'
     BUILDITEM_SERVICE_ACCOUNT: TBuildItem = 'service-account'
+    BUILDITEM_CLUSTER_ROLE: TBuildItem = 'cluster-role'
     BUILDITEM_CLUSTER_ROLE_BINDING: TBuildItem = 'cluster-role-binding'
     BUILDITEM_DEPLOYMENT: TBuildItem = 'deployment'
     BUILDITEM_SERVICE: TBuildItem = 'service'
@@ -218,7 +276,7 @@ class Traefik2Builder(Builder):
                                                         enabled=self.object_name('service-account') is not None),
                         'containers': [{
                             'name': 'traefik',
-                            'image': self.option_get('container.traefik'),
+                            'image': self.option_get('container.traefik2'),
                             'args': self.option_get('config.traefik_args'),
                             'ports': self._build_container_ports(),
                             'resources': ValueData(value=self.option_get('kubernetes.resources.deployment'),
