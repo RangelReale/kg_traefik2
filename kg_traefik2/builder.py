@@ -115,7 +115,7 @@ class Traefik2Builder(Builder):
         else:
             rolebinding_name = None
 
-        self.object_names_update({
+        self.object_names_init({
             'service': self.basename(),
             'service-account': serviceaccount_name,
             'cluster-role': role_name,
