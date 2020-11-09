@@ -1,5 +1,4 @@
 from kubragen import KubraGen
-from kubragen.configfile import ConfigFile_Static, ConfigFileOutput_Dict
 from kubragen.consts import PROVIDER_GOOGLE, PROVIDERSVC_GOOGLE_GKE
 from kubragen.object import Object
 from kubragen.option import OptionRoot
