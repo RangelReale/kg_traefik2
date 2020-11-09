@@ -1,12 +1,14 @@
 from typing import List, Optional, Sequence, Any
 
 import yaml
+from kgp_configrendertoml import ConfigFileRender_TOML
 
 from kubragen import KubraGen
 from kubragen.builder import Builder
+from kubragen.configfile import ConfigFileRenderMulti, ConfigFileRender_Yaml, ConfigFileRender_RawStr
 from kubragen.data import ValueData
 from kubragen.exception import InvalidParamError, InvalidNameError
-from kubragen.helper import QuotedStr
+from kubragen.helper import QuotedStr, LiteralStr
 from kubragen.object import ObjectItem, Object
 from kubragen.types import TBuild, TBuildItem
 from .option import Traefik2Options
@@ -73,13 +75,16 @@ class Traefik2Builder(Builder):
     """
     options: Traefik2Options
     _namespace: str
+    configfile: Optional[str]
 
     SOURCE_NAME = 'kg_traefik2'
 
     BUILD_CRD: TBuild = 'crd'
     BUILD_ACCESSCONTROL: TBuild = 'accesscontrol'
+    BUILD_CONFIG: TBuild = 'config'
     BUILD_SERVICE: TBuild = 'service'
 
+    BUILDITEM_CONFIG: TBuildItem = 'config'
     BUILDITEM_SERVICE_ACCOUNT: TBuildItem = 'service-account'
     BUILDITEM_CLUSTER_ROLE: TBuildItem = 'cluster-role'
     BUILDITEM_CLUSTER_ROLE_BINDING: TBuildItem = 'cluster-role-binding'
@@ -91,6 +96,7 @@ class Traefik2Builder(Builder):
         if options is None:
             options = Traefik2Options()
         self.options = options
+        self.configfile = None
 
         self._namespace = self.option_get('namespace')
 
@@ -116,6 +122,7 @@ class Traefik2Builder(Builder):
             rolebinding_name = None
 
         self.object_names_init({
+            'config': self.basename('-config'),
             'service': self.basename(),
             'service-account': serviceaccount_name,
             'cluster-role': role_name,
@@ -134,12 +141,14 @@ class Traefik2Builder(Builder):
         return self._namespace
 
     def build_names(self) -> List[TBuild]:
-        return [self.BUILD_CRD, self.BUILD_ACCESSCONTROL, self.BUILD_SERVICE]
+        return [self.BUILD_CRD, self.BUILD_ACCESSCONTROL, self.BUILD_CONFIG, self.BUILD_SERVICE]
 
     def build_names_required(self) -> List[TBuild]:
         ret = [self.BUILD_SERVICE]
         if self.option_get('config.create_traefik_crd') is not False:
             ret.append(self.BUILD_CRD)
+        if self.option_get('config.traefik_config') is not None:
+            ret.append(self.BUILD_CONFIG)
         if self.option_get('config.authorization.serviceaccount_create') is not False or \
                 self.option_get('config.authorization.roles_create') is not False:
             ret.append(self.BUILD_ACCESSCONTROL)
@@ -147,6 +156,7 @@ class Traefik2Builder(Builder):
 
     def builditem_names(self) -> List[TBuildItem]:
         return [
+            self.BUILDITEM_CONFIG,
             self.BUILDITEM_CLUSTER_ROLE,
             self.BUILDITEM_SERVICE_ACCOUNT,
             self.BUILDITEM_CLUSTER_ROLE_BINDING,
@@ -159,6 +169,8 @@ class Traefik2Builder(Builder):
             return self.internal_build_crd()
         elif buildname == self.BUILD_ACCESSCONTROL:
             return self.internal_build_accesscontrol()
+        elif buildname == self.BUILD_CONFIG:
+            return self.internal_build_config()
         elif buildname == self.BUILD_SERVICE:
             return self.internal_build_service()
         else:
@@ -242,6 +254,33 @@ class Traefik2Builder(Builder):
 
         return ret
 
+    def internal_build_config(self) -> List[ObjectItem]:
+        ret = []
+
+        if self.option_get('config.traefik_config') is not None:
+            if self.option_get('config.config_format') == Traefik2Options.CONFIGFORMAT_TOML:
+                cfname = 'prometheus.toml'
+            elif self.option_get('config.config_format') == Traefik2Options.CONFIGFORMAT_YAML:
+                cfname = 'prometheus.yml'
+            else:
+                raise InvalidParamError('Unknown Traefik config format: ""{}'.format(
+                    self.option_get('config.config_format')))
+
+            ret.extend([
+                Object({
+                    'apiVersion': 'v1',
+                    'kind': 'ConfigMap',
+                    'metadata': {
+                        'name': self.object_name('config'),
+                        'namespace': self.namespace(),
+                    },
+                    'data': {
+                        cfname: LiteralStr(self.configfile_get()),
+                    },
+                }, name=self.BUILDITEM_CONFIG, source=self.SOURCE_NAME, instance=self.basename())
+            ])
+        return ret
+
     def internal_build_service(self) -> List[ObjectItem]:
         ret = [Object({
             'kind': 'Deployment',
@@ -272,13 +311,26 @@ class Traefik2Builder(Builder):
                             'config.prometheus_annotation') is not False),
                     },
                     'spec': {
-                        'serviceAccountName': ValueData(value=self.object_name('service-account'),
-                                                        enabled=self.object_name('service-account') is not None),
+                        'serviceAccountName': ValueData(value=self.object_name('service-account'), disabled_if_none=True),
+                        'volumes': [
+                            ValueData({
+                                'name': 'traefik2-config',
+                                'configMap': {
+                                    'name': self.object_name('config')
+                                }
+                            }, enabled=self.option_get('config.traefik_config') is not None),
+                        ],
                         'containers': [{
                             'name': 'traefik',
                             'image': self.option_get('container.traefik2'),
                             'args': self.option_get('config.traefik_args'),
                             'ports': self._build_container_ports(),
+                            'volumeMounts': [
+                                ValueData({
+                                    'name': 'traefik2-config',
+                                    'mountPath': '/etc/traefik',
+                                }, enabled=self.option_get('config.traefik_config') is not None),
+                            ],
                             'resources': ValueData(value=self.option_get('kubernetes.resources.deployment'),
                                                    disabled_if_none=True),
                         }]
@@ -320,6 +372,25 @@ class Traefik2Builder(Builder):
                     'port': port.port_service,
                 })
         return ret
+
+    def configfile_get(self) -> Optional[str]:
+        if self.configfile is None:
+            configfile = self.option_get('config.traefik_config')
+            if configfile is None:
+                return None
+            if isinstance(configfile, str):
+                self.configfile = configfile
+            else:
+                configfilerender = ConfigFileRenderMulti([])
+                if self.option_get('config.config_format') == Traefik2Options.CONFIGFORMAT_TOML:
+                    configfilerender.renderer_add(ConfigFileRender_TOML())
+                elif self.option_get('config.config_format') == Traefik2Options.CONFIGFORMAT_YAML:
+                    configfilerender.renderer_add(ConfigFileRender_Yaml())
+                else:
+                    raise InvalidParamError('Unknown Traefik config format: ""{}'.format(self.option_get('config.config_format')))
+                configfilerender.renderer_add(ConfigFileRender_Yaml())
+                self.configfile = configfilerender.render(configfile.get_value(self))
+        return self.configfile
 
     def _traefik_crd(self):
         return yaml.load_all('''apiVersion: apiextensions.k8s.io/v1beta1

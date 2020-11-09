@@ -1,5 +1,6 @@
 from typing import Optional, Sequence, Mapping
 
+from kubragen.configfile import ConfigFile
 from kubragen.option import OptionDef
 from kubragen.options import Options
 
@@ -48,22 +49,22 @@ class Traefik2Options(Options):
           - namespace
           - str
           - ```default```
+        * - config |rarr| traefik_config
+          - Traefik 2 config file
+          - str, ConfigFile
+          -
+        * - config |rarr| config_format
+          - Config format
+          - :data:`Traefik2Options.CONFIGFORMAT_TOML`, :data:`Traefik2Options.CONFIGFORMAT_YAML`
+          - ```Traefik2Options.CONFIGFORMAT_TOML```
         * - config |rarr| traefik_args
           - traefik args
           - Sequence
-          - [\
-                '--entrypoints.web.Address=:80',\
-                '--entryPoints.metrics.address=:9090',\
-                '--metrics.prometheus=true',\
-                '--metrics.prometheus.entryPoint=metrics',\
-            ]
+          - []
         * - config |rarr| ports
           - ports configuration
           - Sequence[:class:`Traefik2OptionsPort`]
-          - [\
-                Traefik2OptionsPort(name='web', port_container=80, port_service=80),\
-                Traefik2OptionsPort(name='metrics', port_container=9090, in_service=False),\
-            ]
+          - []
         * - config |rarr| create_traefik_crd
           - whether to create the traefik crds
           - bool
@@ -101,6 +102,10 @@ class Traefik2Options(Options):
           - Mapping
           -
     """
+
+    CONFIGFORMAT_TOML = 'toml'
+    CONFIGFORMAT_YAML = 'yaml'
+
     def define_options(self):
         """
         Declare the options for the Traefik 2 builder.
@@ -111,16 +116,10 @@ class Traefik2Options(Options):
             'basename': OptionDef(required=True, default_value='traefik2', allowed_types=[str]),
             'namespace': OptionDef(required=True, default_value='default', allowed_types=[str]),
             'config': {
-                'traefik_args': OptionDef(required=True, default_value=[
-                    '--entrypoints.web.Address=:80',
-                    '--entryPoints.metrics.address=:9090',
-                    '--metrics.prometheus=true',
-                    '--metrics.prometheus.entryPoint=metrics',
-                ], allowed_types=[Sequence]),
-                'ports': OptionDef(required=True, default_value=[
-                    Traefik2OptionsPort(name='web', port_container=80, port_service=80),
-                    Traefik2OptionsPort(name='metrics', port_container=9090, in_service=False),
-                ], allowed_types=[Sequence]),
+                'traefik_config': OptionDef(allowed_types=[str, ConfigFile]),
+                'config_format': OptionDef(default_value=self.CONFIGFORMAT_TOML, allowed_types=[str]),
+                'traefik_args': OptionDef(required=True, default_value=[], allowed_types=[Sequence]),
+                'ports': OptionDef(required=True, default_value=[], allowed_types=[Sequence]),
                 'create_traefik_crd': OptionDef(required=True, default_value=True, allowed_types=[bool]),
                 'enable_prometheus': OptionDef(required=True, default_value=True, allowed_types=[bool]),
                 'prometheus_port': OptionDef(required=True, default_value=9090, allowed_types=[int]),

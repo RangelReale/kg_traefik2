@@ -1,4 +1,5 @@
 from kubragen import KubraGen
+from kubragen.configfile import ConfigFile_Static, ConfigFileOutput_Dict
 from kubragen.consts import PROVIDER_GOOGLE, PROVIDERSVC_GOOGLE_GKE
 from kubragen.object import Object
 from kubragen.option import OptionRoot
@@ -7,7 +8,7 @@ from kubragen.output import OutputProject, OD_FileTemplate, OutputFile_ShellScri
     OutputDriver_Print
 from kubragen.provider import Provider
 
-from kg_traefik2 import Traefik2Builder, Traefik2Options
+from kg_traefik2 import Traefik2Builder, Traefik2Options, Traefik2ConfigFile, Traefik2OptionsPort
 
 kg = KubraGen(provider=Provider(PROVIDER_GOOGLE, PROVIDERSVC_GOOGLE_GKE), options=Options({
     'namespaces': {
@@ -45,9 +46,24 @@ shell_script.append(f'kubectl config set-context --current --namespace=app-monit
 #
 # SETUP: traefik2
 #
+traefik2_config_file = Traefik2ConfigFile()
+
 traefik2_config = Traefik2Builder(kubragen=kg, options=Traefik2Options({
     'namespace': OptionRoot('namespaces.mon'),
     'basename': 'mytraefik2',
+    'config': {
+        'traefik_config': traefik2_config_file,
+        'traefik_args': [
+            '--entrypoints.web.Address=:80',
+            '--entryPoints.metrics.address=:9090',
+            '--metrics.prometheus=true',
+            '--metrics.prometheus.entryPoint=metrics',
+        ],
+        'ports': [
+            Traefik2OptionsPort(name='web', port_container=80, port_service=80),
+            Traefik2OptionsPort(name='metrics', port_container=9090, in_service=False),
+        ],
+    },
     'kubernetes': {
         'resources': {
             'deployment': {
@@ -65,7 +81,7 @@ traefik2_config = Traefik2Builder(kubragen=kg, options=Traefik2Options({
 }))
 
 traefik2_config.ensure_build_names(traefik2_config.BUILD_CRD, traefik2_config.BUILD_ACCESSCONTROL,
-                                   traefik2_config.BUILD_SERVICE)
+                                   traefik2_config.BUILD_CONFIG, traefik2_config.BUILD_SERVICE)
 
 #
 # OUTPUTFILE: traefik2-crd.yaml
@@ -84,7 +100,7 @@ shell_script.append(OD_FileTemplate(f'kubectl apply -f ${{FILE_{file.fileid}}}')
 file = OutputFile_Kubernetes('traefik2-config.yaml')
 out.append(file)
 
-file.append(traefik2_config.build(traefik2_config.BUILD_ACCESSCONTROL))
+file.append(traefik2_config.build(traefik2_config.BUILD_ACCESSCONTROL, traefik2_config.BUILD_CONFIG))
 
 shell_script.append(OD_FileTemplate(f'kubectl apply -f ${{FILE_{file.fileid}}}'))
 
