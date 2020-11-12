@@ -79,17 +79,17 @@ class Traefik2Builder(Builder):
 
     SOURCE_NAME = 'kg_traefik2'
 
-    BUILD_CRD: TBuild = 'crd'
-    BUILD_ACCESSCONTROL: TBuild = 'accesscontrol'
-    BUILD_CONFIG: TBuild = 'config'
-    BUILD_SERVICE: TBuild = 'service'
+    BUILD_CRD = TBuild('crd')
+    BUILD_ACCESSCONTROL = TBuild('accesscontrol')
+    BUILD_CONFIG = TBuild('config')
+    BUILD_SERVICE = TBuild('service')
 
-    BUILDITEM_CONFIG: TBuildItem = 'config'
-    BUILDITEM_SERVICE_ACCOUNT: TBuildItem = 'service-account'
-    BUILDITEM_CLUSTER_ROLE: TBuildItem = 'cluster-role'
-    BUILDITEM_CLUSTER_ROLE_BINDING: TBuildItem = 'cluster-role-binding'
-    BUILDITEM_DEPLOYMENT: TBuildItem = 'deployment'
-    BUILDITEM_SERVICE: TBuildItem = 'service'
+    BUILDITEM_CONFIG = TBuildItem('config')
+    BUILDITEM_SERVICE_ACCOUNT = TBuildItem('service-account')
+    BUILDITEM_CLUSTER_ROLE = TBuildItem('cluster-role')
+    BUILDITEM_CLUSTER_ROLE_BINDING = TBuildItem('cluster-role-binding')
+    BUILDITEM_DEPLOYMENT = TBuildItem('deployment')
+    BUILDITEM_SERVICE = TBuildItem('service')
 
     def __init__(self, kubragen: KubraGen, options: Optional[Traefik2Options] = None):
         super().__init__(kubragen)
@@ -140,10 +140,10 @@ class Traefik2Builder(Builder):
     def namespace(self):
         return self._namespace
 
-    def build_names(self) -> List[TBuild]:
+    def build_names(self) -> Sequence[TBuild]:
         return [self.BUILD_CRD, self.BUILD_ACCESSCONTROL, self.BUILD_CONFIG, self.BUILD_SERVICE]
 
-    def build_names_required(self) -> List[TBuild]:
+    def build_names_required(self) -> Sequence[TBuild]:
         ret = [self.BUILD_SERVICE]
         if self.option_get('config.create_traefik_crd') is not False:
             ret.append(self.BUILD_CRD)
@@ -154,7 +154,7 @@ class Traefik2Builder(Builder):
             ret.append(self.BUILD_ACCESSCONTROL)
         return ret
 
-    def builditem_names(self) -> List[TBuildItem]:
+    def builditem_names(self) -> Sequence[TBuildItem]:
         return [
             self.BUILDITEM_CONFIG,
             self.BUILDITEM_CLUSTER_ROLE,
@@ -164,7 +164,7 @@ class Traefik2Builder(Builder):
             self.BUILDITEM_SERVICE,
         ]
 
-    def internal_build(self, buildname: TBuild) -> List[ObjectItem]:
+    def internal_build(self, buildname: TBuild) -> Sequence[ObjectItem]:
         if buildname == self.BUILD_CRD:
             return self.internal_build_crd()
         elif buildname == self.BUILD_ACCESSCONTROL:
@@ -176,10 +176,10 @@ class Traefik2Builder(Builder):
         else:
             raise InvalidNameError('Invalid build name: "{}"'.format(buildname))
 
-    def internal_build_crd(self) -> List[ObjectItem]:
+    def internal_build_crd(self) -> Sequence[ObjectItem]:
         return self._traefik_crd()
 
-    def internal_build_accesscontrol(self) -> List[ObjectItem]:
+    def internal_build_accesscontrol(self) -> Sequence[ObjectItem]:
         ret = []
 
         if self.option_get('config.authorization.serviceaccount_create') is not False:
@@ -254,7 +254,7 @@ class Traefik2Builder(Builder):
 
         return ret
 
-    def internal_build_config(self) -> List[ObjectItem]:
+    def internal_build_config(self) -> Sequence[ObjectItem]:
         ret = []
 
         if self.option_get('config.traefik_config') is not None:
@@ -281,7 +281,7 @@ class Traefik2Builder(Builder):
             ])
         return ret
 
-    def internal_build_service(self) -> List[ObjectItem]:
+    def internal_build_service(self) -> Sequence[ObjectItem]:
         ret = [Object({
             'kind': 'Deployment',
             'apiVersion': 'apps/v1',

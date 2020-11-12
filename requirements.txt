@@ -1,2 +1,2 @@
-kubragen>=0.7.18
-kgp_configrendertoml>=0.7.2
+kubragen>=0.8.2
+kgp_configrendertoml>=0.8.0
